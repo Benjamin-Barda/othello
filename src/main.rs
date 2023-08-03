@@ -1,11 +1,15 @@
 mod mcts;
 mod bitboard;
 
-
 fn main() {
-    
-}
 
+    let mcts = mcts::MCTS::new(String::from("./model.pt"));
+    let white_bb = bitboard::get_initial_white_bitboard();
+    let black_bb = bitboard::get_initial_black_bitboard();
+
+    let out = mcts.search([black_bb, white_bb], 1);
+    println!("{:?}", out);
+}
 /*
 let w_bb = bitboard::get_initial_white_bitboard();
 let b_bb = bitboard::get_initial_black_bitboard();

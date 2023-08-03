@@ -6,12 +6,6 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-eframe="0.22.0"
-threadpool = "1.8.1"
-pyo3 = {version = "0.19.2", features = ["extension-module"] }
 tch = "0.13.0"
 
-[lib]
-name = "othello"
 
-crate-type = ["cdylib", "rlib"]

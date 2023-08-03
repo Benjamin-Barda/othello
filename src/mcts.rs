@@ -2,20 +2,20 @@ use crate::bitboard::*;
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use tch::{Tensor, CModule}; 
+use tch::{Tensor, CModule, IValue, Kind}; 
 
 type BoardState = [u64; 2];
 
 #[derive(Clone)]
 struct Node {
     state: BoardState,
-    prob: f32,
+    prob: f64,
     children: Vec<Rc<RefCell<Node>>>,
     parent: Vec<Rc<RefCell<Node>>>,
     action_taken: Option<usize>,
 
     visit_count: u32,
-    value: f32,
+    value: f64,
 }
 
 impl Default for Node {
@@ -53,21 +53,30 @@ impl Node {
 
     }
 
-    fn get_ucb(&self, child: &Rc<RefCell<Node>>) -> f32 {
-        let q_value: f32;
+    fn get_state(&self) -> Tensor {
+        let s1 = bb2tensor(self.state[0]); 
+        let s2 = bb2tensor(self.state[1]); 
+
+        Tensor::stack(&[s1, s2], 1)
+
+    }
+
+
+    fn get_ucb(&self, child: &Rc<RefCell<Node>>) -> f64 {
+        let q_value: f64;
         if child.borrow().visit_count == 0 {
             q_value = 0.0;
         } else {
-            q_value = child.borrow().value / (child.borrow().visit_count as f32);
+            q_value = child.borrow().value / (child.borrow().visit_count as f64);
         }
 
         // ADD Missing hyperparameter C !!!
         return q_value
-            + ((self.visit_count as f32).ln() / (child.borrow().visit_count as f32)).sqrt();
+            + ((self.visit_count as f64).ln() / (child.borrow().visit_count as f64)).sqrt();
     }
 
     fn select(&self) -> &Rc<RefCell<Node>> {
-        let mut best_ucb: f32 = f32::NEG_INFINITY;
+        let mut best_ucb: f64 = f64::NEG_INFINITY;
         let mut best_child_index: usize = 0;
 
         self.children
@@ -83,7 +92,7 @@ impl Node {
         return self.children.get(best_child_index).unwrap();
     }
 
-    fn expand(&mut self, policy: Vec<f32>) {
+    fn expand(&mut self, policy: Vec<f64>) {
         let iter = policy.iter().enumerate().filter(|(_, prob)| **prob > 0.0);
         for (action, prob) in iter {
             let i_action: u64 = 1 << action;
@@ -101,7 +110,7 @@ impl Node {
         }
     }
 
-    fn backpropagate(&mut self, value: f32) {
+    fn backpropagate(&mut self, value: f64) {
 
         self.value += value; 
         self.visit_count += 1; 
@@ -119,23 +128,14 @@ impl Node {
 
 
 
-struct MCTS {
+pub struct MCTS {
     model: CModule
 }
 
-trait Evaluator {
-    fn eval(state : Tensor) -> f32;
-}
 
-impl Evaluator for MCTS {
-
-    fn eval(state : Tensor) -> f32 {
-        todo!()
-    }
-}
 
 impl MCTS {
-    fn new(model_file : String) -> Self {
+    pub fn new(model_file : String) -> Self {
         let model =  match CModule::load(model_file) {
             Ok(model) => model,
             Err(_) => panic!("Failed To Load Model") ,
@@ -145,10 +145,16 @@ impl MCTS {
         };
     }
 
-    fn search(state: BoardState, num_searches : usize) {
-        let mut root = Node::new(state); 
+    fn eval(&self, state : Tensor) -> Result<IValue, tch::TchError> {
+        return self.model.forward_is(&[
+                IValue::Tensor(state) 
+        ]);
+    }
 
-        for search in 0..num_searches {
+    pub fn search(&self, state: BoardState, num_searches : usize) -> Vec<u32> {
+        let root = Node::new(state); 
+
+        for _ in 0..num_searches {
             let mut node = root.clone();    
 
             while !node.is_leaf() {
@@ -156,19 +162,48 @@ impl MCTS {
             }
 
             let is_game_finished =  is_game_ended(node.state[0], node.state[1]);
-            
+
+            let mut policy : Tensor;
+            let value : f64;
+
             if !is_game_finished {
-                // Get policy and value from model
-                // softmax the policy
-                // mask_it with valid moves only
-                // Normalize it maybe
-                // expand using policy
+                let state = node.get_state(); 
+                let out = self.eval(state).unwrap();
+                (policy, value) = match out {
+                    IValue::Tuple(ivals) => match &ivals[..] {
+                        [IValue::Tensor(pol), IValue::Double(val)] =>(pol.shallow_clone(), *val as f64), 
+                        _ => panic!("Something went wrong in model forward")
+                    
+                    }, 
+                    _ => panic!("Something went wrong in model forward")
+                };
+
+
+                policy = policy.softmax(-1, Kind::Float);
+                policy *= bb2tensor(generate_legal_moves(node.state[0], node.state[1]));
+                policy /= policy.sum(Kind::Float);
+
+                node.expand(policy
+                    .iter::<f64>()
+                    .unwrap()
+                    .collect::<Vec<f64>>()
+                    )
+            } else {
+                value = match game_result(node.state[0], node.state[1]) {
+                    GameResult::WIN => 1.0,
+                    GameResult::DRAW => 0.0,
+                    GameResult::LOSS => 0.0,
+                };
             }
-            //Backpropagate
+
+            node.backpropagate(value)
 
         }
         // return action prob for each of the candidates move
-
+        let action_probs : Vec<u32> = root.children.iter()
+            .map(|child| child.as_ref().take().visit_count)
+            .collect();
+        return action_probs;
     }
 
 }
