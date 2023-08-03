@@ -27,3 +27,12 @@ class SampleModel(nn.Module):
         pol = self.policy_head(x)
 
         return (eval, pol)
+
+
+if __name__ == '__main__' : 
+    model = SampleModel()
+    model.eval()
+
+    sample = torch.rand(1, 2, 8, 8)
+    traced_script_module = torch.jit.trace(model, sample) 
+    traced_script_module.save('model.pt')

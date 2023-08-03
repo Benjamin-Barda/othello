@@ -1,10 +1,9 @@
-use server::server_start;
-
+mod mcts;
 mod bitboard;
-mod server;
+
 
 fn main() {
-    server_start(35326, 1);
+    
 }
 
 /*

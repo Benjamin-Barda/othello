@@ -1,3 +1,5 @@
+use tch::{Tensor, Kind, Device};
+
 const A_FILE: u64 = 0x0101010101010101;
 const H_FILE: u64 = 0x8080808080808080;
 
@@ -10,6 +12,12 @@ enum Direction {
     NE,
     SE,
     SW,
+}
+
+pub enum GameResult {
+    WIN, 
+    DRAW, 
+    LOSS
 }
 
 fn shift(x: u64, y: isize) -> u64 {
@@ -118,6 +126,42 @@ pub fn get_initial_black_bitboard() -> u64 {
     0x0000000810000000
 }
 
+pub fn bb2tensor(bb: u64) -> Tensor{
+    let mut bb_arr : [f32; 64] = [0.0; 64];
+    for i in 0..64 {
+        if bb << i & 1 == 0 {
+            bb_arr[i] = 0.0;
+        } else {
+            bb_arr[i] = 1.0;
+        }
+    }
+
+    return Tensor::from_slice(&bb_arr);
+
+}
+
+pub fn has_legal_moves(my_bb : u64, opp_bb: u64) -> bool {
+    return generate_legal_moves(my_bb, opp_bb) != 0;
+}
+
+pub fn is_game_ended(my_bb: u64, opp_bb: u64) -> bool {
+    return !(has_legal_moves(my_bb, opp_bb) | has_legal_moves(opp_bb, my_bb));
+}
+
+pub fn game_result(my_bb: u64, opp_bb: u64) -> GameResult {
+    let my_score = my_bb.count_ones(); 
+    let opp_score = opp_bb.count_ones();
+
+    if my_score > opp_score {
+        return GameResult::WIN;
+    } else if my_score == opp_score {
+        return GameResult::DRAW;
+    } else {
+        return GameResult::LOSS;
+    }
+}
+
+
 pub fn render(w_bb: u64, b_bb: u64, legal_moves: u64) -> String {
     let mut board: String = String::new();
 
@@ -150,8 +194,9 @@ pub fn render(w_bb: u64, b_bb: u64, legal_moves: u64) -> String {
         b_bb = b_bb >> 1;
         legal_moves = legal_moves >> 1;
     }
-    board
+    return board;
 }
+
 
 #[cfg(test)]
 mod tests {
@@ -171,12 +216,5 @@ mod tests {
         let w_bb: u64 = get_initial_white_bitboard();
         let b_bb: u64 = get_initial_black_bitboard();
         let mov: u64 = 0x0000100000000000;
-    }
-
-    #[test]
-    fn test_has_legal_moves() {
-        let res: u64 = 0x0000102004080000;
-        assert_eq!(has_legal_moves(res), true);
-        assert_eq!(has_legal_moves(0), false);
     }
 }

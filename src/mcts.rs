@@ -2,6 +2,8 @@ use crate::bitboard::*;
 use std::cell::RefCell;
 use std::rc::Rc;
 
+use tch::{Tensor, CModule}; 
+
 type BoardState = [u64; 2];
 
 #[derive(Clone)]
@@ -19,8 +21,8 @@ struct Node {
 impl Default for Node {
     fn default() -> Self {
         Node {
-            state: [get_initial_white_bitboard(), get_initial_black_bitboard()],
-            prob: 0 as f32,
+            state: [get_initial_black_bitboard(), get_initial_white_bitboard()],
+            prob: 0.0,
             children: Vec::new(),
             parent: Vec::new(),
             action_taken: None,
@@ -33,9 +35,22 @@ impl Default for Node {
 
 impl Node {
 
+    fn new(state : BoardState) -> Self {
+        Node {
+            state, 
+            prob : 0.0, 
+            children: Vec::new(), 
+            parent: Vec::new(), 
+            action_taken: None, 
+
+            visit_count: 0, 
+            value: 0.0
+        }        
+    }
+
     fn is_leaf(&self) -> bool {
         return self.children.is_empty();
-    
+
     }
 
     fn get_ucb(&self, child: &Rc<RefCell<Node>>) -> f32 {
@@ -87,17 +102,73 @@ impl Node {
     }
 
     fn backpropagate(&mut self, value: f32) {
-        
+
         self.value += value; 
         self.visit_count += 1; 
-        
+
         match self.parent.is_empty() {
             true => {}, 
             false => {
-               self.parent.first().unwrap().take().backpropagate(0.0 - self.value);
+                self.parent.first().unwrap().take().backpropagate(0.0 - self.value);
             }
         };
-        
+
 
     }
+}
+
+
+
+struct MCTS {
+    model: CModule
+}
+
+trait Evaluator {
+    fn eval(state : Tensor) -> f32;
+}
+
+impl Evaluator for MCTS {
+
+    fn eval(state : Tensor) -> f32 {
+        todo!()
+    }
+}
+
+impl MCTS {
+    fn new(model_file : String) -> Self {
+        let model =  match CModule::load(model_file) {
+            Ok(model) => model,
+            Err(_) => panic!("Failed To Load Model") ,
+        };
+        return MCTS {
+            model
+        };
+    }
+
+    fn search(state: BoardState, num_searches : usize) {
+        let mut root = Node::new(state); 
+
+        for search in 0..num_searches {
+            let mut node = root.clone();    
+
+            while !node.is_leaf() {
+                node = node.select().as_ref().take();
+            }
+
+            let is_game_finished =  is_game_ended(node.state[0], node.state[1]);
+            
+            if !is_game_finished {
+                // Get policy and value from model
+                // softmax the policy
+                // mask_it with valid moves only
+                // Normalize it maybe
+                // expand using policy
+            }
+            //Backpropagate
+
+        }
+        // return action prob for each of the candidates move
+
+    }
+
 }
