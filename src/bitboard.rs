@@ -110,7 +110,6 @@ pub fn resolve_move(mov: u64, my_bb: u64, opp_bb: u64) -> [u64; 2] {
     [my_bb | flipped | mov, opp_bb & !flipped]
 }
 
-
 pub fn get_initial_white_bitboard() -> u64 {
     0x0000001008000000
 }
@@ -118,7 +117,6 @@ pub fn get_initial_white_bitboard() -> u64 {
 pub fn get_initial_black_bitboard() -> u64 {
     0x0000000810000000
 }
-
 
 pub fn render(w_bb: u64, b_bb: u64, legal_moves: u64) -> String {
     let mut board: String = String::new();
