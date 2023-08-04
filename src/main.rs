@@ -1,16 +1,21 @@
-mod mcts;
 mod bitboard;
+mod mcts;
+
+use std::io::prelude::*;
+use std::net::TcpStream;
 
 fn main() {
-
-    let mcts = mcts::MCTS::new(String::from("./model.pt"));
+    let stream = TcpStream::connect("0.0.0.0:65432").unwrap();
+    let mut mc = mcts::MCTS { stream };
     let white_bb = bitboard::get_initial_white_bitboard();
     let black_bb = bitboard::get_initial_black_bitboard();
 
-    let out = mcts.search([black_bb, white_bb], 1);
+    let out = mc.search([black_bb, white_bb], 1);
     println!("{:?}", out);
 }
+
 /*
+
 let w_bb = bitboard::get_initial_white_bitboard();
 let b_bb = bitboard::get_initial_black_bitboard();
 
