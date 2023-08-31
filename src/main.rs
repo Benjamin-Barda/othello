@@ -1,5 +1,5 @@
 mod bitboard;
-mod mcts;
+mod mctsnew;
 
 use std::io::prelude::*;
 use std::net::TcpStream;
@@ -10,7 +10,7 @@ fn main() {
     let white_bb = bitboard::get_initial_white_bitboard();
     let black_bb = bitboard::get_initial_black_bitboard();
 
-    let out = mc.search([black_bb, white_bb], 1);
+    let out = mc.search([black_bb, white_bb], 100);
     println!("{:?}", out);
 }
 

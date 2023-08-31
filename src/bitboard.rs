@@ -145,6 +145,17 @@ pub fn game_result(my_bb: u64, opp_bb: u64) -> GameResult {
     }
 }
 
+pub fn bb2vec(bb: u64) -> Vec<f64> {
+    let mut bool_vector: Vec<f64> = Vec::new();
+    for i in 0..64 {
+        bool_vector.push(match (bb >> i) & 1 == 1 {
+            true => 1.0,
+            false => 0.0,
+        });
+    }
+    return bool_vector;
+}
+
 pub fn render(w_bb: u64, b_bb: u64, legal_moves: u64) -> String {
     let mut board: String = String::new();
 

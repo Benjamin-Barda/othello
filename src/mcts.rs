@@ -95,10 +95,9 @@ impl Node {
         return self.children.get(best_child_index).unwrap();
     }
 
-    fn expand(&mut self, policy: Vec<f64>) {
-        let iter = policy.iter().enumerate().filter(|(_, prob)| **prob > 0.0);
+    fn expand(&mut self, policy: Vec<f64>, mask: Vec<f64>) {
+        let iter = policy.iter().enumerate().filter(|(i, prob)| **prob > 0.0 && 1.0 == *mask.get(*i).unwrap() );
         for (action, prob) in iter {
-            println!("{}", action);
             let i_action: u64 = 1 << action;
             let new_state: BoardState = resolve_move(i_action, self.state[0], self.state[1]);
             self.children.push(Rc::new(RefCell::new(Node {
@@ -138,14 +137,14 @@ pub struct MCTS {
 impl MCTS {
     fn eval(&mut self, state: Payload) -> (Vec<f64>, f64) {
         self.stream.write(&state).unwrap();
-        return (vec![0.0; 63], 0.0);
+        let policy = vec![0.5; 64];
+        return (policy, 0.2);
     }
 
     pub fn search(&mut self, state: BoardState, num_searches: usize) -> Vec<u32> {
-        let mut root = Node::new(state);
+        let mut node = Node::new(state);
 
         for _ in 0..num_searches {
-            let mut node = root.clone();
 
             while !node.is_leaf() {
                 node = node.select().as_ref().take();
@@ -157,11 +156,10 @@ impl MCTS {
             let value: f64;
 
             if !is_game_finished {
-                let state = node.get_payload_to_send();
-                let ev = self.eval(state);
+                let new_state = node.get_payload_to_send();
+                let ev = self.eval(new_state);
                 (policy, value) = ev;
-
-                node.expand(policy);
+                node.expand(policy, bb2vec(generate_legal_moves(state[0], state[1])));
             } else {
                 value = match game_result(node.state[0], node.state[1]) {
                     GameResult::WIN => 1.0,
@@ -171,17 +169,16 @@ impl MCTS {
             }
 
             node.backpropagate(value);
-            root = node;
         }
 
         // return action prob for each of the candidates move
-        let action_probs: Vec<u32> = root
+        let action_probs: Vec<u32> = node
             .children
             .iter()
             .map(|child| child.as_ref().take().visit_count)
             .collect();
 
-        println!("{}", root.children.is_empty());
+        println!("{}", node.children.is_empty());
         return action_probs;
     }
 }
